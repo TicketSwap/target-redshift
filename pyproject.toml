@@ -1,0 +1,62 @@
+[tool.poetry]
+name = "target-redshift"
+version = "0.0.1"
+description = "`target-redshift` is a Singer target for Redshift, built with the Meltano Singer SDK."
+readme = "README.md"
+authors = ["Tobias Cadee <tobias.cadee@ticketswap.com>"]
+keywords = [
+    "ELT",
+    "Redshift",
+]
+license = "Apache-2.0"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.13"
+singer-sdk = { version="~=0.34.0" }
+fs-s3fs = { version = "~=1.1.1", optional = true }
+redshift-connector = "^2.0.918"
+boto3 = "^1.34.15"
+paramiko = "^3.4.0"
+sshtunnel = "^0.4.0"
+pyarrow = "^15.0.2"
+pandas = "^2.2.1"
+
+[tool.poetry.dev-dependencies]
+pytest = ">=7.4.0"
+singer-sdk = { version="~=0.34.0", extras = ["testing"] }
+
+[tool.poetry.extras]
+s3 = ["fs-s3fs"]
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.3"
+
+[tool.ruff]
+src = ["target_redshift"]
+target-version = "py37"
+
+[tool.ruff.lint]
+ignore = [
+    "ANN101",  # missing-type-self
+    "ANN102",  # missing-type-cls
+    "COM812",  # missing-trailing-comma
+    "ISC001",  # single-line-implicit-string-concatenation
+]
+select = ["ALL"]
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = true
+
+[tool.ruff.lint.isort]
+known-first-party = ["target_redshift"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[build-system]
+requires = ["poetry-core>=1.0.8"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+# CLI declaration
+target-redshift = 'target_redshift.target:TargetRedshift.cli'

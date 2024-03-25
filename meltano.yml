@@ -1,0 +1,49 @@
+version: 1
+send_anonymous_usage_stats: true
+project_id: target-redshift
+default_environment: test
+environments:
+- name: test
+plugins:
+  extractors:
+  - name: tap-intercom
+    namespace: tap_intercom
+    pip_url: git+https://github.com/TicketSwap/tap-intercom.git
+    executable: tap-intercom
+    load_schema: meltano_test
+    capabilities:
+    - state
+    - catalog
+    - discover
+    config:
+      start_date: '2024-03-25T12:00:00Z'
+      access_token: $TAP_INTERCOM_ACCESS_TOKEN
+      stream_maps:
+        conversation_parts:
+          has_body: str(body != "")
+          body: __NULL__
+    select:
+    - conversations.*
+    - conversation_parts.*
+
+  loaders:
+  - name: target-redshift
+    namespace: target_redshift
+    pip_url: -e .
+    capabilities:
+    - about
+    - stream-maps
+    - record-flattening
+    config:
+      user: data_jobs
+      password: $TARGET_REDSHIFT_PASSWORD
+      host: 127.0.0.1
+      port: 5001
+      database: reporting
+      aws_copy_role_arn: arn:aws:iam::573569180693:role/AllowRedshiftToAccessS3Bucket
+      s3_bucket: ticketswap-redshift-reporting
+      s3_path: meltano-staging-test
+      flattening_enabled: true
+      flattening_max_depth: 5
+      ssl_mode: prefer
+      ssl_enable: true
