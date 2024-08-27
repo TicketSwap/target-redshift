@@ -1,32 +1,28 @@
 """Common SQL connectors for Streams and Sinks."""
 
 from __future__ import annotations
+
 import typing as t
+from contextlib import contextmanager
 from typing import cast
 
-from contextlib import contextmanager
 import boto3
-
-from singer_sdk.typing import _jsonschema_type_check
-from singer_sdk import typing as th
+import redshift_connector
+from redshift_connector import Cursor
 from singer_sdk.connectors import SQLConnector
 from singer_sdk.helpers._typing import get_datelike_property_type
-from redshift_connector import Cursor
-import redshift_connector
-
+from singer_sdk.typing import _jsonschema_type_check
+from sqlalchemy import DDL, Column, MetaData, Table
 from sqlalchemy.engine.url import URL
-from sqlalchemy_redshift.dialect import SUPER, BIGINT, VARCHAR, DOUBLE_PRECISION
+from sqlalchemy.schema import CreateSchema, CreateTable, DropTable
 from sqlalchemy.types import (
     BOOLEAN,
     DATE,
     DATETIME,
-    DECIMAL,
     TIME,
-    VARCHAR,
+    TypeEngine,
 )
-from sqlalchemy.schema import CreateTable, DropTable, CreateSchema
-from sqlalchemy.types import TypeEngine
-from sqlalchemy import Table, MetaData, DDL, Column
+from sqlalchemy_redshift.dialect import BIGINT, DOUBLE_PRECISION, SUPER, VARCHAR
 
 
 class RedshiftConnector(SQLConnector):
@@ -44,6 +40,7 @@ class RedshiftConnector(SQLConnector):
 
         Args:
             schema_name: The target schema name.
+            cursor: The database cursor.
         """
         schema_exists = self.schema_exists(schema_name)
         if not schema_exists:
@@ -54,11 +51,24 @@ class RedshiftConnector(SQLConnector):
 
         Args:
             schema_name: The target schema to create.
+            cursor: The database cursor.
         """
         cursor.execute(str(CreateSchema(schema_name)))
 
     @contextmanager
-    def _connect_cursor(self) -> t.Iterator[Cursor]:
+    def connect_cursor(self) -> t.Iterator[Cursor]:
+        """Connect to a redshift connector cursor.
+
+        Returns:
+        -------
+        t.Iterator[Cursor]
+            A redshift connector cursor.
+
+        Yields:
+        ------
+        Iterator[t.Iterator[Cursor]]
+            A redshift connector cursor.
+        """
         user, password = self.get_credentials()
         with redshift_connector.connect(
             user=user,
@@ -71,14 +81,13 @@ class RedshiftConnector(SQLConnector):
                 yield cursor
             connection.commit()
 
-    def prepare_table(  # type: ignore[override]
+    def prepare_table(  # type: ignore[override]  # noqa: D417
         self,
         full_table_name: str,
         schema: dict,
         primary_keys: t.Sequence[str],
         cursor: Cursor,
-        partition_keys: list[str] | None = None,
-        as_temp_table: bool = False,
+        as_temp_table: bool = False,  # noqa: FBT001, FBT002
     ) -> Table:
         """Adapt target table to provided schema if possible.
 
@@ -87,7 +96,6 @@ class RedshiftConnector(SQLConnector):
             schema: the JSON Schema for the table.
             primary_keys: list of key properties.
             connection: the database connection.
-            partition_keys: list of partition keys.
             as_temp_table: True to create a temp table.
 
         Returns:
@@ -116,7 +124,6 @@ class RedshiftConnector(SQLConnector):
                 meta=meta,
                 schema=schema,
                 primary_keys=primary_keys,
-                partition_keys=partition_keys,
                 as_temp_table=as_temp_table,
                 cursor=cursor,
             )
@@ -149,7 +156,7 @@ class RedshiftConnector(SQLConnector):
         full_table_name: str,
         from_table: Table,
         cursor: Cursor,
-        as_temp_table: bool = False,
+        as_temp_table: bool = False,  # noqa: FBT001, FBT002
     ) -> Table:
         """Copy table structure.
 
@@ -157,6 +164,7 @@ class RedshiftConnector(SQLConnector):
             full_table_name: the target table name potentially including schema
             from_table: the  source table
             connection: the database connection.
+            cursor: A redshift connector cursor.
             as_temp_table: True to create a temp table.
 
         Returns:
@@ -165,26 +173,27 @@ class RedshiftConnector(SQLConnector):
         _, schema_name, table_name = self.parse_full_table_name(full_table_name)
         meta = MetaData(schema=schema_name)
         new_table: Table
-        columns = []
         if self.table_exists(full_table_name=full_table_name):
-            raise RuntimeError("Table already exists")
-        for column in from_table.columns:
-            columns.append(column._copy())
+            msg = "Table already exists"
+            raise RuntimeError(msg)
+        columns = [column._copy() for column in from_table.columns]  # noqa: SLF001
         if as_temp_table:
             new_table = Table(table_name, meta, *columns, prefixes=["TEMPORARY"])
         else:
             new_table = Table(table_name, meta, *columns)
 
-        create_table_ddl = str(CreateTable(new_table).compile(dialect=self._engine.dialect))
+        create_table_ddl = str(
+            CreateTable(new_table).compile(dialect=self._engine.dialect)
+        )
         cursor.execute(create_table_ddl)
         return new_table
 
-    def drop_table(self, table: Table, cursor: Cursor):
+    def drop_table(self, table: Table, cursor: Cursor) -> None:
         """Drop table data."""
         drop_table_ddl = str(DropTable(table).compile(dialect=self._engine.dialect))
         cursor.execute(drop_table_ddl)
 
-    def to_sql_type(self, jsonschema_type: dict) -> TypeEngine:
+    def to_sql_type(self, jsonschema_type: dict) -> TypeEngine:  # noqa: PLR0911
         """Convert JSON Schema type to a SQL type.
 
         Args:
@@ -223,8 +232,7 @@ class RedshiftConnector(SQLConnector):
         schema: dict,
         cursor: Cursor,
         primary_keys: t.Sequence[str] | None = None,
-        partition_keys: list[str] | None = None,
-        as_temp_table: bool = False,
+        as_temp_table: bool = False,  # noqa: FBT001, FBT002
     ) -> Table:
         """Create an empty target table.
 
@@ -249,7 +257,11 @@ class RedshiftConnector(SQLConnector):
         try:
             properties: dict = schema["properties"]
         except KeyError:
-            raise RuntimeError(f"Schema for table_name: '{table_name}'" f"does not define properties: {schema}")
+            msg = (
+                f"Schema for table_name: '{table_name}'"
+                f"does not define properties: {schema}"
+            )
+            raise RuntimeError(msg)  # noqa: B904
 
         for property_name, property_jsonschema in properties.items():
             is_primary_key = property_name in primary_keys
@@ -266,7 +278,9 @@ class RedshiftConnector(SQLConnector):
         else:
             new_table = Table(table_name, meta, *columns)
 
-        create_table_ddl = str(CreateTable(new_table).compile(dialect=self._engine.dialect))
+        create_table_ddl = str(
+            CreateTable(new_table).compile(dialect=self._engine.dialect)
+        )
         cursor.execute(create_table_ddl)
         return new_table
 
@@ -288,7 +302,9 @@ class RedshiftConnector(SQLConnector):
             column_object: a SQLAlchemy column. optional.
         """
         column_name = column_name.lower().replace(" ", "_")
-        column_exists = column_object is not None or self.column_exists(full_table_name, column_name)
+        column_exists = column_object is not None or self.column_exists(
+            full_table_name, column_name
+        )
 
         if not column_exists:
             self._create_empty_column(
@@ -321,6 +337,7 @@ class RedshiftConnector(SQLConnector):
             full_table_name: The target table name.
             column_name: The name of the new column.
             sql_type: SQLAlchemy type engine to be used in creating the new column.
+            cursor: a database cursor.
 
         Raises:
             NotImplementedError: if adding columns is not supported.
@@ -361,7 +378,10 @@ class RedshiftConnector(SQLConnector):
         column = Column(column_name, column_type)
 
         return DDL(
-            ('ALTER TABLE "%(schema_name)s"."%(table_name)s"' "ADD COLUMN %(column_name)s %(column_type)s"),
+            (
+                'ALTER TABLE "%(schema_name)s"."%(table_name)s"'
+                "ADD COLUMN %(column_name)s %(column_type)s"
+            ),
             {
                 "schema_name": schema_name,
                 "table_name": table_name,
@@ -383,6 +403,7 @@ class RedshiftConnector(SQLConnector):
             full_table_name: The target table name.
             column_name: The target column name.
             sql_type: The new SQLAlchemy type.
+            cursor: a database cursor.
 
         Raises:
             NotImplementedError: if altering columns is not supported.
@@ -452,7 +473,10 @@ class RedshiftConnector(SQLConnector):
         """
         column = Column(column_name, column_type)
         return DDL(
-            ('ALTER TABLE "%(schema_name)s"."%(table_name)s"' "ALTER COLUMN %(column_name)s %(column_type)s"),
+            (
+                'ALTER TABLE "%(schema_name)s"."%(table_name)s"'
+                "ALTER COLUMN %(column_name)s %(column_type)s"
+            ),
             {
                 "schema_name": schema_name,
                 "table_name": table_name,
@@ -467,20 +491,17 @@ class RedshiftConnector(SQLConnector):
         Args:
             config: The configuration for the connector.
         """
-        if config.get("sqlalchemy_url"):
-            return cast(str, config["sqlalchemy_url"])
-        else:
-            user, password = self.get_credentials()
-            sqlalchemy_url = URL.create(
-                drivername=config["dialect+driver"],
-                username=user,
-                password=password,
-                host=config["host"],
-                port=config["port"],
-                database=config["dbname"],
-                query=self.get_sqlalchemy_query(config),
-            )
-            return cast(str, sqlalchemy_url)
+        user, password = self.get_credentials()
+        sqlalchemy_url = URL.create(
+            drivername="redshift+redshift_connector",
+            username=user,
+            password=password,
+            host=config["host"],
+            port=config["port"],
+            database=config["dbname"],
+            query=self.get_sqlalchemy_query(config),
+        )
+        return cast(str, sqlalchemy_url)
 
     def get_sqlalchemy_query(self, config: dict) -> dict:
         """Get query values to be used for sqlalchemy URL creation.
@@ -500,9 +521,9 @@ class RedshiftConnector(SQLConnector):
         return query
 
     def get_credentials(self) -> tuple[str, str]:
-        """Use boto3 to get temporary cluster credentials
+        """Use boto3 to get temporary cluster credentials.
 
-        Returns
+        Returns:
         -------
         tuple[str, str]
             username and password
@@ -517,6 +538,4 @@ class RedshiftConnector(SQLConnector):
                 AutoCreate=False,
             )
             return response["DbUser"], response["DbPassword"]
-        else:
-            return self.config["user"], self.config["password"]
-
+        return self.config["user"], self.config["password"]

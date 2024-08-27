@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import PurePath
+from typing import TYPE_CHECKING
 
 from singer_sdk import typing as th
 from singer_sdk.target_base import SQLTarget
 
 from target_redshift.sinks import RedshiftSink
+
+if TYPE_CHECKING:
+    from pathlib import PurePath
 
 
 class TargetRedshift(SQLTarget):
@@ -18,8 +21,8 @@ class TargetRedshift(SQLTarget):
     def __init__(
         self,
         config: dict | PurePath | str | list[PurePath | str] | None = None,
-        parse_env_config: bool = False,
-        validate_config: bool = True,
+        parse_env_config: bool = False,  # noqa: FBT001, FBT002
+        validate_config: bool = True,  # noqa: FBT001, FBT002
     ) -> None:
         """Initialize the target.
 
@@ -38,7 +41,7 @@ class TargetRedshift(SQLTarget):
             validate_config=validate_config,
         )
 
-        assert self.config.get("add_record_metadata") or not self.config.get(
+        assert self.config.get("add_record_metadata") or not self.config.get(  # noqa: S101
             "activate_version"
         ), (
             "Activate version messages can't be processed unless add_record_metadata "
@@ -46,7 +49,7 @@ class TargetRedshift(SQLTarget):
             "`activate_version` configuration to False."
         )
 
-        assert self.config.get("s3_bucket") is not None
+        assert self.config.get("s3_bucket") is not None  # noqa: S101
 
     name = "target-redshift"
 
@@ -55,7 +58,8 @@ class TargetRedshift(SQLTarget):
             "host",
             th.StringType,
             description=(
-                "Hostname for redshift instance. Note if sqlalchemy_url is set this will be ignored."
+                "Hostname for redshift instance. Note if sqlalchemy_url is set this "
+                "will be ignored."
             ),
         ),
         th.Property(
@@ -64,35 +68,40 @@ class TargetRedshift(SQLTarget):
             default="5432",
             description=(
                 "The port on which redshift is awaiting connection. "
-                + "Note if sqlalchemy_url is set this will be ignored."
+                "Note if sqlalchemy_url is set this will be ignored."
             ),
         ),
         th.Property(
             "enable_iam_authentication",
             th.BooleanType,
             description=(
-                "If true, use temporary credentials (https://docs.aws.amazon.com/redshift/latest/mgmt/generating-iam-credentials-cli-api.html). Note if sqlalchemy_url is set this will be ignored."
+                "If true, use temporary credentials "
+                "(https://docs.aws.amazon.com/redshift/latest/mgmt/generating-iam-credentials-cli-api.html). "  # noqa: E501
+                "Note if sqlalchemy_url is set this will be ignored."
             ),
         ),
         th.Property(
             "cluster_identifier",
             th.StringType,
             description=(
-                "Redshift cluster identifier. Note if sqlalchemy_url is set or enable_iam_authentication is false this will be ignored."
+                "Redshift cluster identifier. Note if sqlalchemy_url is set or "
+                "enable_iam_authentication is false this will be ignored."
             ),
         ),
         th.Property(
             "user",
             th.StringType,
             description=(
-                "User name used to authenticate. Note if sqlalchemy_url is set this will be ignored."
+                "User name used to authenticate. Note if sqlalchemy_url is set this "
+                "will be ignored."
             ),
         ),
         th.Property(
             "password",
             th.StringType,
             description=(
-                "Password used to authenticate. Note if sqlalchemy_url is set this will be ignored."
+                "Password used to authenticate. Note if sqlalchemy_url is set this "
+                "will be ignored."
             ),
         ),
         th.Property(
@@ -119,8 +128,9 @@ class TargetRedshift(SQLTarget):
             "s3_region",
             th.StringType,
             description=(
-                "AWS region for S3 bucket. If not specified, region will be detected by boto config resolution."
-                + "See https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html"
+                "AWS region for S3 bucket. If not specified, region will be "
+                "detected by boto config resolution. "
+                "See https://boto3.amazonaws.com/v1/documentation/api/latest/guide/configuration.html"
             ),
         ),
         th.Property(
@@ -152,7 +162,7 @@ class TargetRedshift(SQLTarget):
             default=False,
             description=(
                 "If set to false, the tap will ignore activate version messages. If "
-                + "set to true, add_record_metadata must be set to true as well."
+                "set to true, add_record_metadata must be set to true as well."
             ),
         ),
         th.Property(
@@ -161,9 +171,9 @@ class TargetRedshift(SQLTarget):
             default=False,
             description=(
                 "When activate version is sent from a tap this specefies "
-                + "if we should delete the records that don't match, or mark "
-                + "them with a date in the `_sdc_deleted_at` column. This config "
-                + "option is ignored if `activate_version` is set to false."
+                "if we should delete the records that don't match, or mark "
+                "them with a date in the `_sdc_deleted_at` column. This config "
+                "option is ignored if `activate_version` is set to false."
             ),
         ),
         th.Property(
@@ -172,9 +182,9 @@ class TargetRedshift(SQLTarget):
             default=False,
             description=(
                 "Note that this must be enabled for activate_version to work!"
-                + "This adds _sdc_extracted_at, _sdc_batched_at, and more to every "
-                + "table. See https://sdk.meltano.com/en/latest/implementation/record_metadata.html "  # noqa: E501
-                + "for more information."
+                "This adds _sdc_extracted_at, _sdc_batched_at, and more to every "
+                "table. See https://sdk.meltano.com/en/latest/implementation/record_metadata.html "  # noqa: E501
+                "for more information."
             ),
         ),
         th.Property(
@@ -183,9 +193,9 @@ class TargetRedshift(SQLTarget):
             default=False,
             description=(
                 "Whether or not to use ssl to verify the server's identity. Use"
-                + " ssl_certificate_authority and ssl_mode for further customization."
-                + " To use a client certificate to authenticate yourself to the server,"
-                + " use ssl_client_certificate_enable instead."
+                " ssl_certificate_authority and ssl_mode for further customization."
+                " To use a client certificate to authenticate yourself to the server,"
+                " use ssl_client_certificate_enable instead."
             ),
         ),
         th.Property(
@@ -194,8 +204,8 @@ class TargetRedshift(SQLTarget):
             default="verify-full",
             description=(
                 "SSL Protection method, see [redshift documentation](https://docs.aws.amazon.com/redshift/latest/mgmt/connecting-ssl-support.html"
-                + " for more information. Must be one of disable, allow, prefer,"
-                + " require, verify-ca, or verify-full."
+                " for more information. Must be one of disable, allow, prefer,"
+                " require, verify-ca, or verify-full."
             ),
         ),
     ).to_dict()

@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-import uuid
-from singer_sdk.sinks import SQLSink
-import os
+import contextlib
 import csv
+import os
+import uuid
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Iterable
+
+import boto3
 import simplejson as json
 import sqlalchemy
-import boto3
-from .connector import RedshiftConnector
-from typing import List, Any, Iterable, Dict, Optional
 from botocore.exceptions import ClientError
-
 from singer_sdk.helpers._compat import (
     date_fromisoformat,
     datetime_fromisoformat,
@@ -23,9 +23,12 @@ from singer_sdk.helpers._typing import (
     get_datelike_property_type,
     handle_invalid_timestamp_in_record,
 )
+from singer_sdk.sinks import SQLSink
 
 from target_redshift.connector import RedshiftConnector
-from redshift_connector import Cursor
+
+if TYPE_CHECKING:
+    from redshift_connector import Cursor
 
 
 class RedshiftSink(SQLSink):
@@ -34,7 +37,7 @@ class RedshiftSink(SQLSink):
     connector_class = RedshiftConnector
     MAX_SIZE_DEFAULT = 50000
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:  # noqa: ANN002, ANN003
         """Initialize SQL Sink. See super class for more details."""
         super().__init__(*args, **kwargs)
         self.temp_table_name = self.generate_temp_table_name()
@@ -53,7 +56,9 @@ class RedshiftSink(SQLSink):
             The target schema name.
         """
         # Look for a default_target_scheme in the configuraion fle
-        default_target_schema: str = self.config.get("default_target_schema", os.getenv("MELTANO_EXTRACT__LOAD_SCHEMA"))
+        default_target_schema: str = self.config.get(
+            "default_target_schema", os.getenv("MELTANO_EXTRACT__LOAD_SCHEMA")
+        )
         parts = self.stream_name.split("-")
 
         # 1) When default_target_scheme is in the configuration use it
@@ -74,7 +79,7 @@ class RedshiftSink(SQLSink):
             self.append_only = True
         else:
             self.append_only = False
-        with self.connector._connect_cursor() as cursor:
+        with self.connector.connect_cursor() as cursor:
             if self.schema_name:
                 self.connector.prepare_schema(self.schema_name, cursor=cursor)
             self.connector.prepare_table(
@@ -85,9 +90,9 @@ class RedshiftSink(SQLSink):
                 as_temp_table=False,
             )
 
-    def generate_temp_table_name(self):
+    def generate_temp_table_name(self) -> str:
         """Uuid temp table name."""
-        # sqlalchemy.exc.IdentifierError: Identifier
+        # sqlalchemy.exc.IdentifierError: Identifier  # noqa: ERA001
         # 'temp_test_optional_attributes_388470e9_fbd0_47b7_a52f_d32a2ee3f5f6'
         # exceeds maximum length of 63 characters
         # Is hit if we have a long table name, there is no limit on Temporary tables
@@ -105,9 +110,11 @@ class RedshiftSink(SQLSink):
         """
         # If duplicates are merged, these can be tracked via
         # :meth:`~singer_sdk.Sink.tally_duplicate_merged()`.
-        with self.connector._connect_cursor() as cursor:
+        with self.connector.connect_cursor() as cursor:
             # Get target table
-            table: sqlalchemy.Table = self.connector.get_table(full_table_name=self.full_table_name)
+            table: sqlalchemy.Table = self.connector.get_table(
+                full_table_name=self.full_table_name
+            )
             # Create a temp table (Creates from the table above)
             temp_table: sqlalchemy.Table = self.connector.copy_table_structure(
                 full_table_name=self.temp_table_name,
@@ -117,35 +124,30 @@ class RedshiftSink(SQLSink):
             )
             # Insert into temp table
             self.file = f"{self.stream_name}-{self.temp_table_name}.csv"
-            self.path = os.path.join(self.config["temp_dir"], self.file)
-            self.object = os.path.join(self.config["s3_key_prefix"], self.file)
-            self.bulk_insert_records(
+            self.path = Path(self.config["temp_dir"]) / self.file
+            self.object = Path(self.config["s3_key_prefix"]) / self.file
+            self._bulk_insert_records(
                 table=temp_table,
-                schema=self.schema,
-                primary_keys=self.key_properties,
                 records=context["records"],
                 cursor=cursor,
             )
-            self.logger.info(f'merging {len(context["records"])} records into {table}')
+            self.logger.info(f'merging {len(context["records"])} records into {table}')  # noqa: G004
             # Merge data from temp table to main table
-            self.upsert(
+            self._upsert(
                 from_table=temp_table,
                 to_table=table,
-                schema=self.schema,
                 join_keys=self.key_properties,
                 cursor=cursor,
             )
             # clean_resources
-        self.clean_resources()
+        self._clean_resources()
 
-    def bulk_insert_records(  # type: ignore[override]
+    def _bulk_insert_records(  # type: ignore[override]
         self,
         table: sqlalchemy.Table,
-        schema: dict,
-        records: Iterable[Dict[str, Any]],
-        primary_keys: List[str],
+        records: Iterable[dict[str, Any]],
         cursor: Cursor,
-    ) -> Optional[int]:
+    ) -> int | None:
         """Bulk insert records to an existing destination table.
 
         The default implementation uses a generic SQLAlchemy bulk insert operation.
@@ -153,28 +155,29 @@ class RedshiftSink(SQLSink):
         faster, native bulk uploads.
 
         Args:
-            full_table_name: the target table name.
+            table: the target table name.
             schema: the JSON schema for the new table, to be used when inferring column
                 names.
             records: the input records.
+            cursor: the redshift connector cursor.
 
         Returns:
             True if table exists, False if not, None if unsure or undetectable.
         """
-        self.write_csv(records)
-        self.logger.info(f'writing {len(records)} records to s3://{self.config["s3_bucket"]}/{self.object}')
-        self.copy_to_s3()
-        self.copy_to_redshift(table, cursor)
+        self._write_csv(records)
+        msg = f'writing {len(records)} records to s3://{self.config["s3_bucket"]}/{self.object}'
+        self.logger.info(msg)
+        self._copy_to_s3()
+        self._copy_to_redshift(table, cursor)
         return True
 
-    def upsert(
+    def _upsert(
         self,
         from_table: sqlalchemy.Table,
         to_table: sqlalchemy.Table,
-        schema: dict,
-        join_keys: List[str],
+        join_keys: list[str],
         cursor: Cursor,
-    ) -> Optional[int]:
+    ) -> int | None:
         """Merge upsert data from one table to another.
 
         Args:
@@ -206,21 +209,46 @@ class RedshiftSink(SQLSink):
         cursor.execute(merge_sql)
         return None
 
-    def write_csv(self, records: List[dict]) -> int:
-        #     """Write a CSV file."""
+    def _write_csv(self, records: list[dict]) -> None:
+        """Write records to a local csv file.
+
+        Parameters
+        ----------
+        records : List[dict]
+            the input records.
+
+        Returns:
+        -------
+        None
+
+        Raises:
+        ------
+        ValueError
+            _description_
+        """
         if "properties" not in self.schema:
-            raise ValueError("Stream's schema has no properties defined.")
-        keys: List[str] = list(self.schema["properties"].keys())
-        try:
-            os.mkdir(self.config["temp_dir"])
-        except:
-            pass
-        object_keys = [key for key, value in self.schema["properties"].items() if "object" in value["type"] or "array" in value["type"]]
+            msg = "Stream's schema has no properties defined."
+            raise ValueError(msg)
+        keys: list[str] = list(self.schema["properties"].keys())
+        with contextlib.suppress(Exception):
+            Path.mkdir(self.config["temp_dir"])
+        object_keys = [
+            key
+            for key, value in self.schema["properties"].items()
+            if "object" in value["type"] or "array" in value["type"]
+        ]
         records = [
-            {key: (json.dumps(value).replace("None", "") if key in object_keys else value) for key, value in record.items()}
+            {
+                key: (
+                    json.dumps(value).replace("None", "")
+                    if key in object_keys
+                    else value
+                )
+                for key, value in record.items()
+            }
             for record in records
         ]
-        with open(self.path, "w", encoding="utf-8", newline="") as fp:
+        with Path.open(self.path, "w", encoding="utf-8", newline="") as fp:
             writer = csv.DictWriter(
                 fp,
                 fieldnames=keys,
@@ -229,13 +257,17 @@ class RedshiftSink(SQLSink):
             )
             writer.writerows(records)
 
-    def copy_to_s3(self):
+    def _copy_to_s3(self) -> None:
+        """Copy the csv file to s3."""
         try:
-            _ = self.s3_client.upload_file(self.path, self.config["s3_bucket"], self.object)
-        except ClientError as e:
-            self.logger.error(e)
+            _ = self.s3_client.upload_file(
+                self.path, self.config["s3_bucket"], self.object
+            )
+        except ClientError:
+            self.logger.exception()
 
-    def copy_to_redshift(self, table: sqlalchemy.Table, cursor: Cursor):
+    def _copy_to_redshift(self, table: sqlalchemy.Table, cursor: Cursor) -> None:
+        """Copy the s3 csv file to redshift."""
         copy_credentials = f"IAM_ROLE '{self.config['aws_redshift_copy_role_arn']}'"
 
         # Step 3: Generate copy options - Override defaults from config.json if defined
@@ -247,11 +279,11 @@ class RedshiftSink(SQLSink):
             COMPUPDATE OFF STATUPDATE OFF
         """,
         )
-        columns = ", ".join([f'"{column}"' for column in self.schema["properties"].keys()])
+        columns = ", ".join([f'"{column}"' for column in self.schema["properties"]])
         # Step 4: Load into the stage table
         copy_sql = f"""
             COPY {self.connector.quote(str(table))} ({columns})
-            FROM 's3://{self.config["s3_bucket"]}/{self.object}' 
+            FROM 's3://{self.config["s3_bucket"]}/{self.object}'
             {copy_credentials}
             {copy_options}
             CSV
@@ -303,10 +335,13 @@ class RedshiftSink(SQLSink):
                     )
                 record[key] = date_val
 
-    def clean_resources(self):
-        os.remove(self.path)
+    def _clean_resources(self) -> None:
+        """Remove local and s3 resources."""
+        Path.unlink(self.path)
         if self.config["remove_s3_files"]:
             try:
-                _ = self.s3_client.delete_object(Bucket=self.config["s3_bucket"], Key=self.object)
-            except ClientError as e:
-                self.logger.error(e)
+                _ = self.s3_client.delete_object(
+                    Bucket=self.config["s3_bucket"], Key=self.object
+                )
+            except ClientError:
+                self.logger.exception()
