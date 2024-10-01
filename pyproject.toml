@@ -19,6 +19,7 @@ boto3 = "^1.35.20"
 sqlalchemy-redshift = "^0.8.14"
 psycopg2-binary = "^2.9.9"
 simplejson = "^3.19.3"
+pyarrow = "^17.0.0"
 
 [tool.poetry.dev-dependencies]
 pytest = ">=7.4.0"

@@ -3,15 +3,21 @@
 from __future__ import annotations
 
 import csv
+import importlib
 import os
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable
+from typing import IO, TYPE_CHECKING, Any, Iterable, Sequence
 
 import boto3
 import simplejson as json
 import sqlalchemy
 from botocore.exceptions import ClientError
+from singer_sdk.helpers._batch import (
+    BaseBatchFileEncoding,
+    BatchFileFormat,
+    StorageTarget,
+)
 from singer_sdk.helpers._compat import (
     date_fromisoformat,
     datetime_fromisoformat,
@@ -27,6 +33,8 @@ from singer_sdk.sinks import SQLSink
 from target_redshift.connector import RedshiftConnector
 
 if TYPE_CHECKING:
+    from gzip import GzipFile
+
     from redshift_connector import Cursor
 
 
@@ -56,7 +64,8 @@ class RedshiftSink(SQLSink):
         """
         # Look for a default_target_scheme in the configuraion fle
         default_target_schema: str = self.config.get(
-            "default_target_schema", os.getenv("MELTANO_EXTRACT__LOAD_SCHEMA")
+            "default_target_schema",
+            os.getenv("MELTANO_EXTRACT__LOAD_SCHEMA"),
         )
         parts = self.stream_name.split("-")
 
@@ -98,7 +107,57 @@ class RedshiftSink(SQLSink):
         # in postgres, used a guid just in case we are using the same session
         return f"{str(uuid.uuid4()).replace('-', '_')}"
 
-    def process_batch(self, context: dict) -> None:
+    def process_batch_files(
+        self,
+        encoding: BaseBatchFileEncoding,
+        files: Sequence[str],
+    ) -> None:
+        """Process a batch file with the given batch context.
+
+        Args:
+            encoding: The batch file encoding.
+            files: The batch files to process.
+
+        Raises:
+            NotImplementedError: If the batch file encoding is not supported.
+        """
+        file: GzipFile | IO
+        storage: StorageTarget | None = None
+
+        for path in files:
+            head, tail = StorageTarget.split_url(path)
+
+            if self.batch_config:
+                storage = self.batch_config.storage
+            else:
+                storage = StorageTarget.from_url(head)
+
+            if (
+                importlib.util.find_spec("pyarrow")
+                and encoding.format == BatchFileFormat.PARQUET
+            ):
+                import pyarrow.parquet as pq
+
+                self.logger.info(path)
+                self.logger.info(head)
+                self.logger.info(tail)
+                self.logger.info(storage)
+
+                with storage.fs(create=False) as batch_fs, batch_fs.open(
+                    tail,
+                    mode="rb",
+                ) as file:
+                    table = pq.read_table(file)
+                    context = {"records": table.to_pylist()}
+                    # self.process_batch(context)
+            else:
+                msg = f"Unsupported batch encoding format: {encoding.format}"
+                raise NotImplementedError(msg)
+
+    def process_batch(
+        self,
+        context: dict,
+    ) -> None:
         """Process a batch with the given batch context.
 
         Writes a batch to the SQL target. Developers may override this method
@@ -112,7 +171,7 @@ class RedshiftSink(SQLSink):
         with self.connector.connect_cursor() as cursor:
             # Get target table
             table: sqlalchemy.Table = self.connector.get_table(
-                full_table_name=self.full_table_name
+                full_table_name=self.full_table_name,
             )
             # Create a temp table (Creates from the table above)
             temp_table: sqlalchemy.Table = self.connector.copy_table_structure(
@@ -264,24 +323,35 @@ class RedshiftSink(SQLSink):
         """Copy the csv file to s3."""
         try:
             _ = self.s3_client.upload_file(
-                self.path, self.config["s3_bucket"], self.object
+                self.path,
+                self.config["s3_bucket"],
+                self.object,
             )
         except ClientError:
             self.logger.exception()
 
-    def copy_to_redshift(self, table: sqlalchemy.Table, cursor: Cursor) -> None:
+    def copy_to_redshift(
+        self,
+        table: sqlalchemy.Table,
+        cursor: Cursor,
+        extension: str = "csv",
+    ) -> None:
         """Copy the s3 csv file to redshift."""
         copy_credentials = f"IAM_ROLE '{self.config['aws_redshift_copy_role_arn']}'"
-
+        copy_options_dict = {
+            "csv": """
+                EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
+                DATEFORMAT 'auto' TIMEFORMAT 'auto'
+                COMPUPDATE OFF STATUPDATE OFF
+                CSV
+                """,
+            "parquet": """
+                STATUPDATE OFF
+                PARQUET
+                """,
+        }
         # Step 3: Generate copy options - Override defaults from config.json if defined
-        copy_options = self.config.get(
-            "copy_options",
-            """
-            EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
-            DATEFORMAT 'auto' TIMEFORMAT 'auto'
-            COMPUPDATE OFF STATUPDATE OFF
-        """,
-        )
+        copy_options = self.config.get("copy_options", copy_options_dict[extension])
         columns = ", ".join([f'"{column}"' for column in self.schema["properties"]])
         # Step 4: Load into the stage table
         copy_sql = f"""
@@ -289,7 +359,6 @@ class RedshiftSink(SQLSink):
             FROM 's3://{self.config["s3_bucket"]}/{self.object}'
             {copy_credentials}
             {copy_options}
-            CSV
         """
         cursor.execute(copy_sql)
 
@@ -344,7 +413,8 @@ class RedshiftSink(SQLSink):
         if self.config["remove_s3_files"]:
             try:
                 _ = self.s3_client.delete_object(
-                    Bucket=self.config["s3_bucket"], Key=self.object
+                    Bucket=self.config["s3_bucket"],
+                    Key=self.object,
                 )
             except ClientError:
                 self.logger.exception()
