@@ -151,7 +151,7 @@ class TargetRedshift(SQLTarget):
         th.Property(
             "default_target_schema",
             th.StringType,
-            description="Redsdhift schema to send data to, example: tap-clickup",
+            description="Redshift schema to send data to, example: tap-clickup",
         ),
         th.Property(
             "activate_version",

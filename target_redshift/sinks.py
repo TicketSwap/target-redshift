@@ -184,7 +184,7 @@ class RedshiftSink(SQLSink):
             self.file = f"{self.stream_name}-{self.temp_table_name}.csv"
             self.path = Path(self.config["temp_dir"]) / self.file
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.object = f'{self.config["s3_key_prefix"]} / {self.file}'
+            self.object = f'{self.config["s3_key_prefix"]}/{self.file}'
             self.bulk_insert_records(
                 table=temp_table,
                 records=context["records"],
