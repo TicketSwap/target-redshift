@@ -144,17 +144,17 @@ lxml = ["lxml"]
 
 [[package]]
 name = "boto3"
-version = "1.35.30"
+version = "1.35.35"
 description = "The AWS SDK for Python"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "boto3-1.35.30-py3-none-any.whl", hash = "sha256:d89c3459db89c5408e83219ab849ffd0146bc4285e75cdc67c6e45d390a12df2"},
-    {file = "boto3-1.35.30.tar.gz", hash = "sha256:d2851aec8e9dc6937977acbe9a5124ecc31b3ad5f50a10cd9ae52636da3f52fa"},
+    {file = "boto3-1.35.35-py3-none-any.whl", hash = "sha256:72eb73d90448632d7388644388be6977293ccb8fbfefd5fd39d7e75ff2d48f8a"},
+    {file = "boto3-1.35.35.tar.gz", hash = "sha256:73d4f22b57a725f0e8a6e0c4b2d16336c128e39f3189c24f9e513daa7c14936b"},
 ]
 
 [package.dependencies]
-botocore = ">=1.35.30,<1.36.0"
+botocore = ">=1.35.35,<1.36.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.10.0,<0.11.0"
 
@@ -163,13 +163,13 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.35.30"
+version = "1.35.35"
 description = "Low-level, data-driven core of boto 3."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "botocore-1.35.30-py3-none-any.whl", hash = "sha256:3bb9f9dde001608671ea74681ac3cec06bbbb10cba8cb8c1387a25e843075ce0"},
-    {file = "botocore-1.35.30.tar.gz", hash = "sha256:ab5350e8a50e48d371fa2d517d65c29a40c43788cb9a15387f93eac5a23df0fd"},
+    {file = "botocore-1.35.35-py3-none-any.whl", hash = "sha256:44b843e310b6338c3086908928709c7a303a2bb0326ea3c93ece5ac5afafb6c8"},
+    {file = "botocore-1.35.35.tar.gz", hash = "sha256:899d303046391caa1d05093a673e52d02185b37bc64bd78771ad6752167a25ab"},
 ]
 
 [package.dependencies]
@@ -181,7 +181,7 @@ urllib3 = [
 ]
 
 [package.extras]
-crt = ["awscrt (==0.21.5)"]
+crt = ["awscrt (==0.22.0)"]
 
 [[package]]
 name = "certifi"
@@ -2174,4 +2174,4 @@ s3 = ["fs-s3fs"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "3f6aa2a3302aa0322e3078c83b0980f50312daa10bd5fbb467ea605eaa958e0e"
+content-hash = "d0d532dff8ae267cf734ea01f241b9ac201b64970e4d2690bc08e164371d463b"
