@@ -15,7 +15,7 @@ python = ">=3.9,<3.13"
 singer-sdk = { version="~=0.43.1" }
 fs-s3fs = { version = "~=1.1.1", optional = true }
 redshift-connector = "^2.1.5"
-boto3 = "^1.35.94"
+boto3 = "^1.35.98"
 sqlalchemy-redshift = "^0.8.14"
 psycopg2-binary = "^2.9.10"
 simplejson = "^3.19.3"
