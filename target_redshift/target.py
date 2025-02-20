@@ -208,6 +208,11 @@ class TargetRedshift(SQLTarget):
                 " require, verify-ca, or verify-full."
             ),
         ),
+        th.Property(
+            "grants",
+            th.ArrayType(th.StringType),
+            description="List of users/roles/groups that will have select permissions on the tables",
+        )
     ).to_dict()
 
     default_sink_class = RedshiftSink

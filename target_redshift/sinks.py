@@ -88,6 +88,7 @@ class RedshiftSink(SQLSink):
                 cursor=cursor,
                 as_temp_table=False,
             )
+            self.connector.grant_privileges(self.schema_name, cursor=cursor)
 
     def generate_temp_table_name(self) -> str:
         """Uuid temp table name."""
