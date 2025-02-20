@@ -287,7 +287,7 @@ class RedshiftConnector(SQLConnector):
                     property_name,
                     self.to_sql_type(property_jsonschema),
                     primary_key=is_primary_key,
-                    autoincrement=False,  # See: https://github.com/MeltanoLabs/target-postgres/issues/193 # noqa: E501
+                    autoincrement=False,  # See: https://github.com/MeltanoLabs/target-postgres/issues/193
                 )
             )
         if as_temp_table:

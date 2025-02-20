@@ -183,7 +183,7 @@ class TargetRedshift(SQLTarget):
             description=(
                 "Note that this must be enabled for activate_version to work!"
                 "This adds _sdc_extracted_at, _sdc_batched_at, and more to every "
-                "table. See https://sdk.meltano.com/en/latest/implementation/record_metadata.html "  # noqa: E501
+                "table. See https://sdk.meltano.com/en/latest/implementation/record_metadata.html"
                 "for more information."
             ),
         ),
