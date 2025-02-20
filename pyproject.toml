@@ -33,6 +33,7 @@ ipykernel = "^6.29.5"
 [tool.ruff]
 src = ["target_redshift"]
 target-version = "py37"
+line-length = 120
 
 [tool.ruff.lint]
 ignore = [
