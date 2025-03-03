@@ -18,7 +18,7 @@ redshift-connector = "^2.1.5"
 boto3 = "^1.36.17"
 sqlalchemy-redshift = "^0.8.14"
 psycopg2-binary = "^2.9.10"
-simplejson = "^3.19.3"
+simplejson = "^3.20.1"
 smart-open = "^7.1.0"
 
 [tool.poetry.dev-dependencies]
