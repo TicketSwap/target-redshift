@@ -24,6 +24,7 @@ from singer_sdk.helpers._typing import (
     handle_invalid_timestamp_in_record,
 )
 from singer_sdk.sinks import SQLSink
+from singer_sdk.typing import _jsonschema_type_check
 
 from target_redshift.connector import RedshiftConnector
 
@@ -56,9 +57,7 @@ class RedshiftSink(SQLSink):
             The target schema name.
         """
         # Look for a default_target_scheme in the configuraion fle
-        default_target_schema: str = self.config.get(
-            "default_target_schema", os.getenv("MELTANO_EXTRACT__LOAD_SCHEMA")
-        )
+        default_target_schema: str = self.config.get("default_target_schema", os.getenv("MELTANO_EXTRACT__LOAD_SCHEMA"))
         parts = self.stream_name.split("-")
 
         # 1) When default_target_scheme is in the configuration use it
@@ -113,9 +112,7 @@ class RedshiftSink(SQLSink):
         # :meth:`~singer_sdk.Sink.tally_duplicate_merged()`.
         with self.connector.connect_cursor() as cursor:
             # Get target table
-            table: sqlalchemy.Table = self.connector.get_table(
-                full_table_name=self.full_table_name
-            )
+            table: sqlalchemy.Table = self.connector.get_table(full_table_name=self.full_table_name)
             # Create a temp table (Creates from the table above)
             temp_table: sqlalchemy.Table = self.connector.copy_table_structure(
                 full_table_name=self.temp_table_name,
@@ -154,9 +151,7 @@ class RedshiftSink(SQLSink):
         Returns:
             The target s3 key.
         """
-        p = Path(self.config["s3_key_prefix"]) / Path(
-            f"{self.stream_name}-{self.temp_table_name}.csv"
-        )
+        p = Path(self.config["s3_key_prefix"]) / Path(f"{self.stream_name}-{self.temp_table_name}.csv")
         return str(p)
 
     def bulk_insert_records(  # type: ignore[override]
@@ -251,15 +246,11 @@ class RedshiftSink(SQLSink):
         object_keys = [
             key
             for key, value in self.schema["properties"].items()
-            if "object" in value["type"] or "array" in value["type"]
+            if _jsonschema_type_check(value, ("object", "array"))
         ]
         return [
             {
-                key: (
-                    json.dumps(value).replace("None", "")
-                    if key in object_keys
-                    else value
-                )
+                key: (json.dumps(value).replace("None", "") if key in object_keys else value)
                 for key, value in record.items()
             }
             for record in records
@@ -355,8 +346,6 @@ class RedshiftSink(SQLSink):
         """Remove local and s3 resources."""
         if self.config["remove_s3_files"]:
             try:
-                _ = self.s3_client.delete_object(
-                    Bucket=self.config["s3_bucket"], Key=self.s3_key()
-                )
+                _ = self.s3_client.delete_object(Bucket=self.config["s3_bucket"], Key=self.s3_key())
             except ClientError:
                 self.logger.exception()
