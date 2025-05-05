@@ -201,9 +201,7 @@ class RedshiftConnector(SQLConnector):
         else:
             new_table = Table(table_name, meta, *columns)
 
-        create_table_ddl = str(
-            CreateTable(new_table).compile(dialect=self._engine.dialect)
-        )
+        create_table_ddl = str(CreateTable(new_table).compile(dialect=self._engine.dialect))
         cursor.execute(create_table_ddl)
         return new_table
 
@@ -276,10 +274,7 @@ class RedshiftConnector(SQLConnector):
         try:
             properties: dict = schema["properties"]
         except KeyError as e:
-            msg = (
-                f"Schema for table_name: '{table_name}'"
-                f"does not define properties: {schema}"
-            )
+            msg = f"Schema for table_name: '{table_name}'" f"does not define properties: {schema}"
             raise RuntimeError(msg) from e
 
         for property_name, property_jsonschema in properties.items():
@@ -297,9 +292,7 @@ class RedshiftConnector(SQLConnector):
         else:
             new_table = Table(table_name, meta, *columns)
 
-        create_table_ddl = str(
-            CreateTable(new_table).compile(dialect=self._engine.dialect)
-        )
+        create_table_ddl = str(CreateTable(new_table).compile(dialect=self._engine.dialect))
         cursor.execute(create_table_ddl)
         return new_table
 
@@ -320,10 +313,7 @@ class RedshiftConnector(SQLConnector):
             cursor: a database cursor.
             column_object: a SQLAlchemy column. optional.
         """
-        column_name = column_name.lower().replace(" ", "_")
-        column_exists = column_object is not None or self.column_exists(
-            full_table_name, column_name
-        )
+        column_exists = column_object is not None or self.column_exists(full_table_name, column_name)
 
         if not column_exists:
             self._create_empty_column(
@@ -397,10 +387,7 @@ class RedshiftConnector(SQLConnector):
         column = Column(column_name, column_type)
 
         return DDL(
-            (
-                'ALTER TABLE "%(schema_name)s"."%(table_name)s"'
-                "ADD COLUMN %(column_name)s %(column_type)s"
-            ),
+            ('ALTER TABLE "%(schema_name)s"."%(table_name)s"' "ADD COLUMN %(column_name)s %(column_type)s"),
             {
                 "schema_name": schema_name,
                 "table_name": table_name,
@@ -495,10 +482,7 @@ class RedshiftConnector(SQLConnector):
         """
         column = Column(column_name, column_type)
         return DDL(
-            (
-                'ALTER TABLE "%(schema_name)s"."%(table_name)s"'
-                "ALTER COLUMN %(column_name)s %(column_type)s"
-            ),
+            ('ALTER TABLE "%(schema_name)s"."%(table_name)s"' "ALTER COLUMN %(column_name)s %(column_type)s"),
             {
                 "schema_name": schema_name,
                 "table_name": table_name,

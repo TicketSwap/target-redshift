@@ -56,9 +56,7 @@ class RedshiftSink(SQLSink):
             The target schema name.
         """
         # Look for a default_target_scheme in the configuraion fle
-        default_target_schema: str = self.config.get(
-            "default_target_schema", os.getenv("MELTANO_EXTRACT__LOAD_SCHEMA")
-        )
+        default_target_schema: str = self.config.get("default_target_schema", os.getenv("MELTANO_EXTRACT__LOAD_SCHEMA"))
         parts = self.stream_name.split("-")
 
         # 1) When default_target_scheme is in the configuration use it
@@ -68,6 +66,15 @@ class RedshiftSink(SQLSink):
         if default_target_schema:
             return default_target_schema
         return self.conform_name(parts[-2], "schema") if len(parts) in {2, 3} else None
+
+    @property
+    def conformed_schema(self) -> dict:
+        """Return the stream schema, conformed to SQL naming standards.
+
+        Returns:
+            The target stream schema.
+        """
+        return self.conform_schema(self.schema)
 
     def setup(self) -> None:
         """Set up Sink.
@@ -84,7 +91,7 @@ class RedshiftSink(SQLSink):
                 self.connector.prepare_schema(self.schema_name, cursor=cursor)
             self.connector.prepare_table(
                 full_table_name=self.full_table_name,
-                schema=self.schema,
+                schema=self.conformed_schema,
                 primary_keys=self.key_properties,
                 cursor=cursor,
                 as_temp_table=False,
@@ -113,9 +120,7 @@ class RedshiftSink(SQLSink):
         # :meth:`~singer_sdk.Sink.tally_duplicate_merged()`.
         with self.connector.connect_cursor() as cursor:
             # Get target table
-            table: sqlalchemy.Table = self.connector.get_table(
-                full_table_name=self.full_table_name
-            )
+            table: sqlalchemy.Table = self.connector.get_table(full_table_name=self.full_table_name)
             # Create a temp table (Creates from the table above)
             temp_table: sqlalchemy.Table = self.connector.copy_table_structure(
                 full_table_name=self.temp_table_name,
@@ -154,9 +159,7 @@ class RedshiftSink(SQLSink):
         Returns:
             The target s3 key.
         """
-        p = Path(self.config["s3_key_prefix"]) / Path(
-            f"{self.stream_name}-{self.temp_table_name}.csv"
-        )
+        p = Path(self.config["s3_key_prefix"]) / Path(f"{self.stream_name}-{self.temp_table_name}.csv")
         return str(p)
 
     def bulk_insert_records(  # type: ignore[override]
@@ -250,17 +253,13 @@ class RedshiftSink(SQLSink):
             raise ValueError(msg)
         object_keys = [
             key
-            for key, value in self.schema["properties"].items()
+            for key, value in self.conformed_schema["properties"].items()
             if "object" in value["type"] or "array" in value["type"]
         ]
         return [
             {
-                key: (
-                    json.dumps(value).replace("None", "")
-                    if key in object_keys
-                    else value
-                )
-                for key, value in record.items()
+                key: (json.dumps(value).replace("None", "") if key in object_keys else value)
+                for key, value in self.conform_record(record).items()
             }
             for record in records
         ]
@@ -268,7 +267,7 @@ class RedshiftSink(SQLSink):
     def write_to_s3(self, records: Iterable[dict[str, Any]]) -> None:
         """Write the csv file to s3."""
         records = self.format_records_as_csv(records)
-        keys: list[str] = list(self.schema["properties"].keys())
+        keys: list[str] = list(self.conformed_schema["properties"].keys())
 
         msg = f"writing {len(records)} records to {self.s3_uri()}"
         self.logger.info(msg)
@@ -295,7 +294,7 @@ class RedshiftSink(SQLSink):
             COMPUPDATE OFF STATUPDATE OFF
         """,
         )
-        columns = ", ".join([f'"{column}"' for column in self.schema["properties"]])
+        columns = ", ".join([f'"{column}"' for column in self.conformed_schema["properties"]])
         # Step 4: Load into the stage table
         copy_sql = f"""
             COPY {self.connector.quote(str(table))} ({columns})
@@ -355,8 +354,6 @@ class RedshiftSink(SQLSink):
         """Remove local and s3 resources."""
         if self.config["remove_s3_files"]:
             try:
-                _ = self.s3_client.delete_object(
-                    Bucket=self.config["s3_bucket"], Key=self.s3_key()
-                )
+                _ = self.s3_client.delete_object(Bucket=self.config["s3_bucket"], Key=self.s3_key())
             except ClientError:
                 self.logger.exception()
