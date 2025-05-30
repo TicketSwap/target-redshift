@@ -24,6 +24,7 @@ from singer_sdk.helpers._typing import (
     handle_invalid_timestamp_in_record,
 )
 from singer_sdk.sinks import SQLSink
+from singer_sdk.typing import _jsonschema_type_check
 
 from target_redshift.connector import RedshiftConnector
 
@@ -254,7 +255,7 @@ class RedshiftSink(SQLSink):
         object_keys = [
             key
             for key, value in self.conformed_schema["properties"].items()
-            if "object" in value["type"] or "array" in value["type"]
+            if _jsonschema_type_check(value, ("object", "array"))
         ]
         return [
             {
