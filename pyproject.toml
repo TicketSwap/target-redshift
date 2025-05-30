@@ -1,35 +1,41 @@
-[tool.poetry]
+[project]
 name = "target-redshift"
 version = "0.2.1"
 description = "`target-redshift` is a Singer target for Redshift, built with the Meltano Singer SDK."
+authors = [{ name = "Tobias Cadee", email = "tobias.cadee@ticketswap.com" }]
+requires-python = ">=3.9,<3.13"
 readme = "README.md"
-authors = ["Tobias Cadee <tobias.cadee@ticketswap.com>"]
+license = "Apache-2.0"
 keywords = [
     "ELT",
     "Redshift",
 ]
-license = "Apache-2.0"
+dependencies = [
+    "singer-sdk~=0.44.3",
+    "redshift-connector>=2.1.5,<3",
+    "boto3>=1.37.19,<2",
+    "sqlalchemy-redshift>=0.8.14,<0.9",
+    "psycopg2-binary>=2.9.10,<3",
+    "simplejson>=3.20.1,<4",
+    "smart-open>=7.1.0,<8",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.9,<3.13"
-singer-sdk = { version="~=0.44.3" }
-fs-s3fs = { version = "~=1.1.1", optional = true }
-redshift-connector = "^2.1.5"
-boto3 = "^1.37.19"
-sqlalchemy-redshift = "^0.8.14"
-psycopg2-binary = "^2.9.10"
-simplejson = "^3.20.1"
-smart-open = "^7.1.0"
+[project.optional-dependencies]
+s3 = ["fs-s3fs~=1.1.1"]
 
-[tool.poetry.dev-dependencies]
-pytest = ">=7.4.0"
-singer-sdk = { version="~=0.44.3", extras = ["testing"] }
+[project.scripts]
+target-redshift = "target_redshift.target:TargetRedshift.cli"
 
-[tool.poetry.extras]
-s3 = ["fs-s3fs"]
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+    "singer-sdk[testing]~=0.44.3",
+    "ipykernel>=6.29.5,<7",
+]
 
-[tool.poetry.group.dev.dependencies]
-ipykernel = "^6.29.5"
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling>=1,<2"]
 
 [tool.ruff]
 src = ["target_redshift"]
@@ -53,11 +59,3 @@ known-first-party = ["target_redshift"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
-
-[build-system]
-requires = ["poetry-core>=1.0.8"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.scripts]
-# CLI declaration
-target-redshift = 'target_redshift.target:TargetRedshift.cli'
