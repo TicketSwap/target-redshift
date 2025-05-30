@@ -68,6 +68,15 @@ class RedshiftSink(SQLSink):
             return default_target_schema
         return self.conform_name(parts[-2], "schema") if len(parts) in {2, 3} else None
 
+    @property
+    def conformed_schema(self) -> dict:
+        """Return the stream schema, conformed to SQL naming standards.
+
+        Returns:
+            The target stream schema.
+        """
+        return self.conform_schema(self.schema)
+
     def setup(self) -> None:
         """Set up Sink.
 
@@ -83,7 +92,7 @@ class RedshiftSink(SQLSink):
                 self.connector.prepare_schema(self.schema_name, cursor=cursor)
             self.connector.prepare_table(
                 full_table_name=self.full_table_name,
-                schema=self.schema,
+                schema=self.conformed_schema,
                 primary_keys=self.key_properties,
                 cursor=cursor,
                 as_temp_table=False,
@@ -245,13 +254,13 @@ class RedshiftSink(SQLSink):
             raise ValueError(msg)
         object_keys = [
             key
-            for key, value in self.schema["properties"].items()
+            for key, value in self.conformed_schema["properties"].items()
             if _jsonschema_type_check(value, ("object", "array"))
         ]
         return [
             {
                 key: (json.dumps(value).replace("None", "") if key in object_keys else value)
-                for key, value in record.items()
+                for key, value in self.conform_record(record).items()
             }
             for record in records
         ]
@@ -259,7 +268,7 @@ class RedshiftSink(SQLSink):
     def write_to_s3(self, records: Iterable[dict[str, Any]]) -> None:
         """Write the csv file to s3."""
         records = self.format_records_as_csv(records)
-        keys: list[str] = list(self.schema["properties"].keys())
+        keys: list[str] = list(self.conformed_schema["properties"].keys())
 
         msg = f"writing {len(records)} records to {self.s3_uri()}"
         self.logger.info(msg)
@@ -286,7 +295,7 @@ class RedshiftSink(SQLSink):
             COMPUPDATE OFF STATUPDATE OFF
         """,
         )
-        columns = ", ".join([f'"{column}"' for column in self.schema["properties"]])
+        columns = ", ".join([f'"{column}"' for column in self.conformed_schema["properties"]])
         # Step 4: Load into the stage table
         copy_sql = f"""
             COPY {self.connector.quote(str(table))} ({columns})
