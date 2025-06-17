@@ -11,7 +11,7 @@ keywords = [
     "Redshift",
 ]
 dependencies = [
-    "singer-sdk~=0.44.3",
+    "singer-sdk~=0.47.1",
     "redshift-connector>=2.1.5,<3",
     "boto3>=1.37.19,<2",
     "sqlalchemy-redshift>=0.8.14,<0.9",
