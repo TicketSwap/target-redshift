@@ -4,25 +4,36 @@
 # https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
 
 version: 2
+
+multi-ecosystem-groups:
+  infrastructure:
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Amsterdam"
+
 updates:
   - package-ecosystem: "docker"
     directory: "/" # Location of package manifests
-    schedule:
-      interval: "weekly"
-      day: "tuesday"
-      time: "09:30"
-      timezone: "Europe/Amsterdam"
+    patterns: ["*"]
+    multi-ecosystem-group: "infrastructure"
+
   - package-ecosystem: "github-actions"
-    directory: "/" # Location of package manifests
-    schedule:
-      interval: "weekly"
-      day: "tuesday"
-      time: "09:30"
-      timezone: "Europe/Amsterdam"
+    directory: "/" # Location of package manifest
+    patterns: ["*"]
+    multi-ecosystem-group: "infrastructure"
+
   - package-ecosystem: "pip"
     directory: "/" # Location of package manifests
     schedule:
-      interval: "weekly"
-      day: "tuesday"
-      time: "09:30"
+      interval: "daily"
+      time: "08:00"
       timezone: "Europe/Amsterdam"
+    groups:
+      minor-pip-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+          - "minor"
