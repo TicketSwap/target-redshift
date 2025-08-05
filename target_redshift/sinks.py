@@ -6,6 +6,7 @@ import csv
 import os
 import uuid
 from pathlib import Path
+from time import time
 from typing import TYPE_CHECKING, Any, Iterable
 
 import boto3
@@ -210,27 +211,49 @@ class RedshiftSink(SQLSink):
             report number of records affected/inserted.
 
         """
-        join_predicates = []
-        to_table_key: sqlalchemy.Column
-        for key in join_keys:
-            from_table_key: sqlalchemy.Column = from_table.columns[key]
-            to_table_key = to_table.columns[key]
-            join_predicates.append(from_table_key == to_table_key)
 
-        join_condition = sqlalchemy.and_(*join_predicates)
         if len(join_keys) > 0:
+            primary_key_filter = sqlalchemy.func.row_number().over(
+                partition_by=[from_table.columns[key] for key in join_keys],
+                order_by=from_table.columns["_sdc_sequence"].desc(),
+            )
+
+            from_table_unique: sqlalchemy.Table = self.connector.copy_table_structure(
+                full_table_name=f"{self.temp_table_name}_unique",
+                from_table=from_table,
+                as_temp_table=True,
+                cursor=cursor,
+            )
+
+            sql = f"""
+                INSERT INTO {self.connector.quote(str(from_table_unique))}
+                SELECT *
+                FROM {self.connector.quote(str(from_table))} as {self.connector.quote(str(from_table))}
+                QUALIFY {primary_key_filter} = 1
+                """  # noqa: S608
+            cursor.execute(sql)
+
+            join_predicates = []
+            for key in join_keys:
+                from_table_key: sqlalchemy.Column = from_table_unique.columns[key]
+                to_table_key: sqlalchemy.Column = to_table.columns[key]
+                join_predicates.append(from_table_key == to_table_key)
+
+            join_condition = sqlalchemy.and_(*join_predicates)
+
             sql = f"""
                 MERGE INTO {self.connector.quote(str(to_table))}
-                USING {self.connector.quote(str(from_table))}
+                USING {self.connector.quote(str(from_table_unique))}
                 ON {join_condition}
                 REMOVE DUPLICATES
                 """
+            cursor.execute(sql)
         else:
             sql = f"""
                 INSERT INTO {self.connector.quote(str(to_table))}
                 SELECT * FROM {self.connector.quote(str(from_table))}
                 """  # noqa: S608
-        cursor.execute(sql)
+            cursor.execute(sql)
 
     def format_records_as_csv(self, records: Iterable[dict[str, Any]]) -> list[dict]:
         """Write records to a local csv file.
@@ -350,6 +373,24 @@ class RedshiftSink(SQLSink):
                         self.logger,
                     )
                 record[key] = date_val
+
+    def _add_sdc_metadata_to_record(
+        self,
+        record: dict,
+        message: dict,
+        context: dict,
+    ) -> None:
+        """Populate metadata _sdc columns from incoming record message.
+        Record metadata specs documented at:
+        https://sdk.meltano.com/en/latest/implementation/record_metadata.html
+        Args:
+            record: Individual record in the stream.
+            message: The record message.
+            context: Stream partition or context dictionary.
+        """
+        super()._add_sdc_metadata_to_record(record, message, context)
+
+        record["_sdc_sequence"] = time.time_ns()
 
     def clean_resources(self) -> None:
         """Remove local and s3 resources."""
