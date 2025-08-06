@@ -84,9 +84,6 @@ class RedshiftSink(SQLSink):
         This method is called on Sink creation, and creates the required Schema and
         Table entities in the target database.
         """
-        self.logger.debug(
-            f"setting up sink with primarykeys: {self.key_properties}"
-        )
         if self.key_properties is None or self.key_properties == []:
             self.append_only = True
         else:
@@ -164,7 +161,9 @@ class RedshiftSink(SQLSink):
         Returns:
             The target s3 key.
         """
-        p = Path(self.config["s3_key_prefix"]) / Path(f"{self.stream_name}-{self.temp_table_name}.csv")
+        p = Path(self.config["s3_key_prefix"]) / Path(
+            f"{self.stream_name}-{self.temp_table_name}.csv"
+        )
         return str(p)
 
     def bulk_insert_records(  # type: ignore[override]
@@ -214,8 +213,6 @@ class RedshiftSink(SQLSink):
             report number of records affected/inserted.
 
         """
-        self.logger.debug(f"Upserting {from_table} to {to_table} on {join_keys}")  # noqa: G004
-
         if len(join_keys) > 0:
             primary_key_filter = sqlalchemy.func.row_number().over(
                 partition_by=[from_table.columns[key] for key in join_keys],
@@ -392,9 +389,7 @@ class RedshiftSink(SQLSink):
             message: The record message.
             context: Stream partition or context dictionary.
         """
-        self.logger.debug(f'adding sdc metadata to record')  # noqa: G004
         super()._add_sdc_metadata_to_record(record, message, context)
-        self.logger.debug(f"Timestamp for record: {time.time_ns()}")  # noqa: G004
         record["_sdc_sequence"] = time.time_ns()
 
     def clean_resources(self) -> None:
