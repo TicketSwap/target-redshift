@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import csv
 import os
+import time
 import uuid
 from pathlib import Path
-from time import time
 from typing import TYPE_CHECKING, Any, Iterable
 
 import boto3
