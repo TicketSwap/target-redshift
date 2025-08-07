@@ -300,7 +300,7 @@ class RedshiftSink(SQLSink):
         self.logger.info(msg)
 
         # Open a binary stream to S3
-        with smart_open.smart_open(self.s3_uri(), "wb") as s3_file:
+        with smart_open.open(self.s3_uri(), "wb") as s3_file:
             # Wrap the S3 stream in gzip, then wrap that in a text stream
             with gzip.GzipFile(fileobj=s3_file, mode="wb") as gzipped_stream:
                 with io.TextIOWrapper(gzipped_stream, encoding="utf-8") as text_stream:
@@ -310,8 +310,7 @@ class RedshiftSink(SQLSink):
                         extrasaction="ignore",
                         dialect="excel",
                     )
-                    for record in records:
-                        writer.writerow(record)
+                    writer.writerows(records)
 
     def copy_to_redshift(self, table: sqlalchemy.Table, cursor: Cursor) -> None:
         """Copy the s3 csv file to redshift."""
@@ -335,6 +334,7 @@ class RedshiftSink(SQLSink):
             {copy_options}
             CSV GZIP
         """
+        self.logger.info(f"Executing COPY command: {copy_sql}")
         cursor.execute(copy_sql)
 
     def parse_timestamps_in_record(
