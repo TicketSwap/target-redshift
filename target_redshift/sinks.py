@@ -34,11 +34,15 @@ from target_redshift.connector import RedshiftConnector
 if TYPE_CHECKING:
     from redshift_connector import Cursor
 
-    def sanitize_record(record):
-        return {
-            k: str(v).encode("utf-8", "replace").decode("utf-8") if v is not None else ""
-            for k, v in record.items()
-        }
+def sanitize_record(record):
+    return {
+        k: (
+            str(v).encode("utf-8", "replace").decode("utf-8")
+            if v is not None
+            else ""
+        )
+        for k, v in record.items()
+    }
 
 class RedshiftSink(SQLSink):
     """Redshift target sink class."""
