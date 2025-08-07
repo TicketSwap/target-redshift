@@ -312,8 +312,8 @@ class RedshiftSink(SQLSink):
             )
             writer.writerows(records)
 
-        with open(filename, "rb") as f_in:
-            with smart_open.open(self.s3_uri(), "wb") as s3_file:
+        with open(filename, "r") as f_in:
+            with smart_open.open(self.s3_uri(), "w") as s3_file:
                 s3_file.write(f_in.read())
 
     def copy_to_redshift(self, table: sqlalchemy.Table, cursor: Cursor) -> None:
