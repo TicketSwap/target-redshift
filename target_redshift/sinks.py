@@ -310,7 +310,6 @@ class RedshiftSink(SQLSink):
                         extrasaction="ignore",
                         dialect="excel",
                     )
-                    writer.writeheader()
                     for record in records:
                         writer.writerow(record)
 
