@@ -164,7 +164,7 @@ class RedshiftSink(SQLSink):
             The target s3 key.
         """
         p = Path(self.config["s3_key_prefix"]) / Path(
-            f"{self.stream_name}-{self.temp_table_name}.csv"
+            f"{self.stream_name}-{self.temp_table_name}.csv.gz"
         )
         return str(p)
 
