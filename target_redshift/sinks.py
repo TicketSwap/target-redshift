@@ -341,7 +341,6 @@ class RedshiftSink(SQLSink):
             {copy_options}
             CSV
         """
-        self.logger.info(f"Executing COPY command: {copy_sql}")
         cursor.execute(copy_sql)
 
     def parse_timestamps_in_record(
