@@ -323,7 +323,7 @@ class RedshiftSink(SQLSink):
         buffer.seek(0)
         
         # Step 3: Upload to S3 using smart_open
-        with smart_open.open(self.s3_uri, "wb") as s3_file:
+        with smart_open.open(self.s3_uri(), "wb") as s3_file:
             s3_file.write(buffer.read())
 
     def copy_to_redshift(self, table: sqlalchemy.Table, cursor: Cursor) -> None:
