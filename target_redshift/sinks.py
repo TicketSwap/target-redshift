@@ -296,7 +296,7 @@ class RedshiftSink(SQLSink):
         records = self.format_records_as_csv(records)
         keys: list[str] = list(self.conformed_schema["properties"].keys())
 
-        msg = f"writing {len(records)} records to {self.s3_uri()}"
+        msg = f"writing {len(records)} records to gz {self.s3_uri()}"
         self.logger.info(msg)
 
         # Open a binary stream to S3
