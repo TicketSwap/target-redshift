@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import csv
+import gzip
+import io
 import os
 import time
 import uuid
@@ -297,14 +299,20 @@ class RedshiftSink(SQLSink):
         msg = f"writing {len(records)} records to {self.s3_uri()}"
         self.logger.info(msg)
 
-        with smart_open.open(self.s3_uri(), "w") as fp:
-            writer = csv.DictWriter(
-                fp,
-                fieldnames=keys,
-                extrasaction="ignore",
-                dialect="excel",
-            )
-            writer.writerows(records)
+        # Open a binary stream to S3
+        with smart_open.smart_open_open(self.s3_uri(), "wb") as s3_file:
+            # Wrap the S3 stream in gzip, then wrap that in a text stream
+            with gzip.GzipFile(fileobj=s3_file, mode="wb") as gzipped_stream:
+                with io.TextIOWrapper(gzipped_stream, encoding="utf-8") as text_stream:
+                    writer = csv.DictWriter(
+                        text_stream,
+                        fieldnames=keys,
+                        extrasaction="ignore",
+                        dialect="excel",
+                    )
+                    writer.writeheader()
+                    for record in records:
+                        writer.writerow(record)
 
     def copy_to_redshift(self, table: sqlalchemy.Table, cursor: Cursor) -> None:
         """Copy the s3 csv file to redshift."""
@@ -326,7 +334,7 @@ class RedshiftSink(SQLSink):
             FROM '{self.s3_uri()}'
             {copy_credentials}
             {copy_options}
-            CSV
+            CSV GZIP
         """
         cursor.execute(copy_sql)
 
