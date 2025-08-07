@@ -322,7 +322,7 @@ class RedshiftSink(SQLSink):
             """
             EMPTYASNULL BLANKSASNULL TRIMBLANKS TRUNCATECOLUMNS
             DATEFORMAT 'auto' TIMEFORMAT 'auto'
-            COMPUPDATE OFF STATUPDATE OFF
+            COMPUPDATE OFF STATUPDATE OFF GZIP
         """,
         )
         columns = ", ".join([f'"{column}"' for column in self.conformed_schema["properties"]])
@@ -332,7 +332,7 @@ class RedshiftSink(SQLSink):
             FROM '{self.s3_uri()}'
             {copy_credentials}
             {copy_options}
-            CSV GZIP
+            CSV
         """
         self.logger.info(f"Executing COPY command: {copy_sql}")
         cursor.execute(copy_sql)
