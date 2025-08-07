@@ -300,7 +300,7 @@ class RedshiftSink(SQLSink):
         self.logger.info(msg)
 
         # Open a binary stream to S3
-        with smart_open.smart_open_open(self.s3_uri(), "wb") as s3_file:
+        with smart_open.smart_open(self.s3_uri(), "wb") as s3_file:
             # Wrap the S3 stream in gzip, then wrap that in a text stream
             with gzip.GzipFile(fileobj=s3_file, mode="wb") as gzipped_stream:
                 with io.TextIOWrapper(gzipped_stream, encoding="utf-8") as text_stream:
