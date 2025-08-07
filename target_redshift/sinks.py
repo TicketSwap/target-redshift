@@ -318,6 +318,7 @@ class RedshiftSink(SQLSink):
                 Key=self.s3_key(),
                 Body=f,
             )
+        filename.unlink()
 
     def copy_to_redshift(self, table: sqlalchemy.Table, cursor: Cursor) -> None:
         """Copy the s3 csv file to redshift."""
