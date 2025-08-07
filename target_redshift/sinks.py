@@ -312,9 +312,13 @@ class RedshiftSink(SQLSink):
             )
             writer.writerows(records)
 
-        with open(filename, "r") as f_in:
-            with smart_open.open(self.s3_uri(), "w") as s3_file:
-                s3_file.write(f_in.read())
+        with open(filename, "rb") as f_in:
+            with smart_open.open(self.s3_uri(), "wb") as s3_file:
+                while True:
+                    chunk = f_in.read(8192)
+                    if not chunk:
+                        break
+                    s3_file.write(chunk)
 
     def copy_to_redshift(self, table: sqlalchemy.Table, cursor: Cursor) -> None:
         """Copy the s3 csv file to redshift."""
