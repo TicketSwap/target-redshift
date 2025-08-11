@@ -33,7 +33,7 @@ class RedshiftConnector(SQLConnector):
     allow_column_alter: bool = False  # Whether altering column types is supported.
     allow_merge_upsert: bool = True  # Whether MERGE UPSERT is supported.
     allow_temp_tables: bool = True  # Whether temp tables are supported.
-    default_varchar_length = 10000
+    default_varchar_length = 65535
 
     def prepare_schema(self, schema_name: str, cursor: Cursor) -> None:
         """Create the target database schema.
