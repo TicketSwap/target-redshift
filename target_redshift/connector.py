@@ -104,9 +104,9 @@ class RedshiftConnector(SQLConnector):
             host=self.config["host"],
             port=self.config["port"],
             database=self.config["dbname"],
-            ssl=self.config["ssl_enable"],
-            sslmode=self.config["ssl_mode"],
-            timeout=1800,
+            ssl=False,
+            # sslmode=self.config["ssl_mode"],
+            timeout=600,
         )
         cursor = connection.cursor()
         try:
