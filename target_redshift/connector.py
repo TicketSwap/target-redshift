@@ -42,7 +42,7 @@ class RedshiftConnector(SQLConnector):
             schema_name: The target schema name.
             cursor: The database cursor.
         """
-        schema_exists = self.schema_exists(schema_name)
+        schema_exists = self.schema_exists(schema_name, cursor=cursor)
         if not schema_exists:
             self.create_schema(schema_name, cursor=cursor)
 
@@ -70,6 +70,19 @@ class RedshiftConnector(SQLConnector):
         """
         cursor.execute(str(CreateSchema(schema_name)))
 
+    def schema_exists(self, schema_name: str, cursor: Cursor) -> bool:
+        """Check if a schema exists.
+
+        Args:
+            schema_name: The target schema name.
+            cursor: The database cursor.
+
+        Returns:
+            bool: True if the schema exists, False otherwise.
+        """
+        cursor.execute(f"select schema_name from svv_all_schemas where schema_name = '{schema_name}'")  # noqa: S608
+        return cursor.fetchone() is not None
+
     @contextmanager
     def connect_cursor(self) -> t.Iterator[Cursor]:
         """Connect to a redshift connector cursor.
@@ -85,7 +98,7 @@ class RedshiftConnector(SQLConnector):
             A redshift connector cursor.
         """
         user, password = self.get_credentials()
-        with redshift_connector.connect(
+        connection = redshift_connector.connect(
             user=user,
             password=password,
             host=self.config["host"],
@@ -93,10 +106,18 @@ class RedshiftConnector(SQLConnector):
             database=self.config["dbname"],
             ssl=self.config["ssl_enable"],
             sslmode=self.config["ssl_mode"],
-        ) as connection:
-            with connection.cursor() as cursor:
-                yield cursor
+            timeout=1800,
+        )
+        cursor = connection.cursor()
+        try:
+            yield cursor
             connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            cursor.close()
+            connection.close()
 
     def prepare_table(  # type: ignore[override]  # noqa: D417, PLR0913
         self,
