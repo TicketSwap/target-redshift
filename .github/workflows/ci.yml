@@ -2,6 +2,8 @@
 ### TODO: Modify as needed or as desired.
 
 name: Test target-redshift
+permissions:
+  contents: read
 
 on:
   pull_request:
