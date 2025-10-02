@@ -64,7 +64,7 @@ class TargetRedshift(SQLTarget):
         th.Property(
             "port",
             th.StringType,
-            default="5432",
+            default="5439",
             description=(
                 "The port on which redshift is awaiting connection."
             ),
