@@ -30,7 +30,7 @@ target-redshift = "target_redshift.target:TargetRedshift.cli"
 dev = [
     "pytest>=7.4.0",
     "singer-sdk[testing]~=0.44.3",
-    "ipykernel>=6.29.5,<7",
+    "ipykernel>=6.29.5,<8",
 ]
 
 [build-system]
