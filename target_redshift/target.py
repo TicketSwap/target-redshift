@@ -57,17 +57,13 @@ class TargetRedshift(SQLTarget):
         th.Property(
             "host",
             th.StringType,
-            description=(
-                "Hostname for redshift instance."
-            ),
+            description=("Hostname for redshift instance."),
         ),
         th.Property(
             "port",
             th.StringType,
             default="5439",
-            description=(
-                "The port on which redshift is awaiting connection."
-            ),
+            description=("The port on which redshift is awaiting connection."),
         ),
         th.Property(
             "enable_iam_authentication",
@@ -89,25 +85,17 @@ class TargetRedshift(SQLTarget):
         th.Property(
             "user",
             th.StringType,
-            description=(
-                "User name used to authenticate. Note if sqlalchemy_url is set this "
-                "will be ignored."
-            ),
+            description=("User name used to authenticate. Note if sqlalchemy_url is set this " "will be ignored."),
         ),
         th.Property(
             "password",
             th.StringType,
-            description=(
-                "Password used to authenticate. Note if sqlalchemy_url is set this "
-                "will be ignored."
-            ),
+            description=("Password used to authenticate. Note if sqlalchemy_url is set this " "will be ignored."),
         ),
         th.Property(
             "dbname",
             th.StringType,
-            description=(
-                "Database name. Note if sqlalchemy_url is set this will be ignored."
-            ),
+            description=("Database name. Note if sqlalchemy_url is set this will be ignored."),
             title="Database Name",
         ),
         th.Property(
@@ -212,7 +200,13 @@ class TargetRedshift(SQLTarget):
             "grants",
             th.ArrayType(th.StringType),
             description="List of users/roles/groups that will have select permissions on the tables",
-        )
+        ),
+        th.Property(
+            "enable_schema_warning",
+            th.BooleanType,
+            default=True,
+            description=("If true, the target will log a warning when a record is not found in the schema."),
+        ),
     ).to_dict()
 
     default_sink_class = RedshiftSink

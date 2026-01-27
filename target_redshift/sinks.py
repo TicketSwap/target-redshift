@@ -325,7 +325,7 @@ class RedshiftSink(SQLSink):
         """
         for key, value in record.items():
             if key not in schema["properties"]:
-                if value is not None:
+                if value is not None and self.config["enable_schema_warning"]:
                     self.logger.warning("No schema for record field '%s'", key)
                 continue
             datelike_type = get_datelike_property_type(schema["properties"][key])
