@@ -160,7 +160,7 @@ class RedshiftSink(SQLSink):
         Returns:
             The target s3 key.
         """
-        p = Path(self.config["s3_key_prefix"]) / Path(f"{self.stream_name}-{self.temp_table_name}.csv")
+        p = Path(self.config["s3_key_prefix"]) / Path(f"{self.stream_name}-{self.temp_table_name}.csv.gz")
         return str(p)
 
     def bulk_insert_records(  # type: ignore[override]
@@ -302,6 +302,7 @@ class RedshiftSink(SQLSink):
             FROM '{self.s3_uri()}'
             {copy_credentials}
             {copy_options}
+            GZIP
             CSV
         """
         cursor.execute(copy_sql)
