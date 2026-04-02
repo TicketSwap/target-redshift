@@ -1,6 +1,6 @@
 [project]
 name = "target-redshift"
-version = "0.3.1"
+version = "0.3.2"
 description = "`target-redshift` is a Singer target for Redshift, built with the Meltano Singer SDK."
 authors = [{ name = "Tobias Cadee", email = "tobias.cadee@ticketswap.com" }]
 requires-python = ">=3.9,<3.13"
