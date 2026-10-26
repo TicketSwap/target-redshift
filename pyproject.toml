@@ -11,7 +11,7 @@ keywords = [
     "Redshift",
 ]
 dependencies = [
-    "singer-sdk~=0.44.3",
+    "singer-sdk~=0.54.9",
     "redshift-connector>=2.1.5,<3",
     "boto3>=1.37.19,<2",
     "sqlalchemy-redshift>=0.8.14,<0.9",
@@ -29,7 +29,7 @@ target-redshift = "target_redshift.target:TargetRedshift.cli"
 [dependency-groups]
 dev = [
     "pytest>=7.4.0",
-    "singer-sdk[testing]~=0.44.3",
+    "singer-sdk[testing]~=0.54.9",
     "ipykernel>=6.29.5,<7",
 ]
 
